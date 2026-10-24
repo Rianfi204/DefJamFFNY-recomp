@@ -1,0 +1,48 @@
+name: iOS Dependencies Check
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ios-port
+    paths:
+      - ".github/workflows/ios-deps-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ios-dependencies:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Show Xcode SDKs
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Check package managers
+        run: |
+          brew --version
+          cmake --version
+          ninja --version
+
+      - name: Check Vulkan and MoltenVK availability
+        run: |
+          brew info molten-vk || true
+          brew info vulkan-headers || true
+          brew info vulkan-loader || true
+          find /opt/homebrew /usr/local -iname '*MoltenVK*' 2>/dev/null | head -40 || true
+
+      - name: Check generated game code
+        run: |
+          if test -f src/recomp/gen/recomp_dispatch.c; then
+            echo "Generated game code exists"
+          else
+            echo "Generated game code is missing; full game build cannot run yet"
+          fi
