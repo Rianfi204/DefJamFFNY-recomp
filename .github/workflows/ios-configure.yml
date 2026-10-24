@@ -25,17 +25,16 @@ jobs:
 
       - name: Inspect Vulkan and shaderc dependencies
         run: |
-          echo "=== Homebrew prefixes ==="
-          brew --prefix
-          brew --prefix molten-vk
-          brew --prefix shaderc
-          echo "=== Vulkan files ==="
-          find "$(brew --prefix molten-vk)" -maxdepth 5 -name 'vulkan.h' -print
-          find "$(brew --prefix molten-vk)" -maxdepth 5 -name 'libvulkan*' -print
-          find "$(brew --prefix molten-vk)" -maxdepth 5 -name 'MoltenVK*' -print
-          echo "=== shaderc files ==="
-          find "$(brew --prefix shaderc)" -maxdepth 5 -name 'shaderc.h' -print
-          find "$(brew --prefix shaderc)" -maxdepth 5 -name 'libshaderc*' -print
+          echo "=== Homebrew packages ==="
+          brew list --versions molten-vk shaderc vulkan-headers vulkan-loader
+          echo "=== Vulkan pkg-config ==="
+          pkg-config --modversion vulkan || true
+          pkg-config --cflags --libs vulkan || true
+          echo "=== shaderc pkg-config ==="
+          pkg-config --modversion shaderc || true
+          pkg-config --cflags --libs shaderc || true
+          echo "=== Matching headers and libraries ==="
+          find /opt/homebrew/Cellar/molten-vk /opt/homebrew/Cellar/vulkan-headers /opt/homebrew/Cellar/vulkan-loader /opt/homebrew/Cellar/shaderc -type f \\( -name 'vulkan.h' -o -name 'shaderc.h' -o -name 'libvulkan*' -o -name 'libshaderc*' -o -name '*MoltenVK*' \\) -print 2>/dev/null || true
 
       - name: Configure runtime-only build for iOS
         run: |
