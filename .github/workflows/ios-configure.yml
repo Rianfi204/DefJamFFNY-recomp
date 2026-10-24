@@ -25,16 +25,24 @@ jobs:
 
       - name: Inspect Vulkan and shaderc dependencies
         run: |
-          echo "=== Homebrew packages ==="
-          brew list --versions molten-vk shaderc vulkan-headers vulkan-loader
-          echo "=== Vulkan pkg-config ==="
+          echo "=== Installed packages ==="
+          for package in molten-vk shaderc vulkan-headers vulkan-loader pkgconf; do
+            echo "--- $package ---"
+            brew list --versions "$package" || true
+          done
+          echo "=== pkg-config ==="
           pkg-config --modversion vulkan || true
           pkg-config --cflags --libs vulkan || true
-          echo "=== shaderc pkg-config ==="
           pkg-config --modversion shaderc || true
           pkg-config --cflags --libs shaderc || true
-          echo "=== Matching headers and libraries ==="
-          find /opt/homebrew/Cellar/molten-vk /opt/homebrew/Cellar/vulkan-headers /opt/homebrew/Cellar/vulkan-loader /opt/homebrew/Cellar/shaderc -type f \\( -name 'vulkan.h' -o -name 'shaderc.h' -o -name 'libvulkan*' -o -name 'libshaderc*' -o -name '*MoltenVK*' \\) -print 2>/dev/null || true
+          echo "=== Homebrew files ==="
+          for directory in /opt/homebrew/Cellar/molten-vk /opt/homebrew/Cellar/vulkan-headers /opt/homebrew/Cellar/vulkan-loader /opt/homebrew/Cellar/shaderc; do
+            if [ -d "$directory" ]; then
+              find "$directory" -type f \( -name 'vulkan.h' -o -name 'shaderc.h' -o -name 'libvulkan*' -o -name 'libshaderc*' -o -name '*MoltenVK*' \) -print
+            else
+              echo "Not found: $directory"
+            fi
+          done
 
       - name: Configure runtime-only build for iOS
         run: |
