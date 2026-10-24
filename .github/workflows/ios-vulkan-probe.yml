@@ -1,0 +1,36 @@
+name: iOS Vulkan Probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ios-port
+    paths:
+      - ".github/workflows/ios-vulkan-probe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  vulkan-probe:
+    runs-on: macos-14
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Vulkan dependencies
+        run: |
+          brew install molten-vk vulkan-headers vulkan-loader shaderc
+
+      - name: Verify installed packages
+        run: |
+          brew list --versions molten-vk vulkan-headers vulkan-loader shaderc
+          find /opt/homebrew /usr/local -iname '*MoltenVK*' 2>/dev/null | head -40 || true
+
+      - name: Check iOS SDK
+        run: |
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphoneos --find clang
+          xcrun --sdk iphoneos clang --version
