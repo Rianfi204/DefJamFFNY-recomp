@@ -1,49 +1,94 @@
 name: iOS Configure Check
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - ios-port
-    paths:
-      - ".github/workflows/ios-configure.yml"
+workflow_dispatch:
+push:
+branches:
+- ios-port
+paths:
+- ".github/workflows/ios-configure.yml"
+- "CMakeLists.txt"
+- "src/"
+- "tools/xboxrecomp/"
 
 permissions:
 contents: read
 
+concurrency:
+group: ios-configure-${{ github.ref }}
+cancel-in-progress: true
+
 jobs:
 configure:
-name: Check iOS dependencies
+name: Check iOS dependencies and CMake
 runs-on: macos-14
+timeout-minutes: 30
 
 steps:
-  - name: Checkout repository
+  - name: Checkout source
     uses: actions/checkout@v4
     with:
       submodules: recursive
 
-  - name: Install tools
+  - name: Show checkout information
     run: |
+      echo "Branch: $GITHUB_REF_NAME"
+      echo "Commit: $GITHUB_SHA"
+      git status --short
+      git submodule status
+
+  - name: Install build tools
+    run: |
+      brew update
       brew install cmake ninja pkgconf sdl3 molten-vk shaderc
 
-  - name: Inspect SDL3 and Vulkan packages
+  - name: Diagnose SDL3
     run: |
-      echo "=== SDL3 ==="
-      brew --prefix sdl3
-      find "$(brew --prefix sdl3)" \
-        -name 'SDL3Config.cmake' \
-        -o -name 'sdl3-config.cmake'
+      set -eux
+      SDL3_PREFIX="$(brew --prefix sdl3)"
+      echo "SDL3_PREFIX=$SDL3_PREFIX"
+      find "$SDL3_PREFIX" \
+        \( -name 'SDL3Config.cmake' -o -name 'sdl3-config.cmake' \) \
+        -print
+      brew list --versions sdl3
 
-      echo "=== Vulkan / MoltenVK ==="
-      find "$(brew --prefix molten-vk)" \
-        -name 'vulkan.h' \
-        -o -name 'libMoltenVK*'
+  - name: Diagnose Vulkan and shaderc
+    run: |
+      set -eux
+      VK_PREFIX="$(brew --prefix molten-vk)"
+      SHADERC_PREFIX="$(brew --prefix shaderc)"
+
+      echo "=== MoltenVK prefix ==="
+      echo "$VK_PREFIX"
+      find "$VK_PREFIX" \
+        \( -name 'vulkan.h' -o -name 'libMoltenVK*' -o -name 'Info.plist' \) \
+        -print
 
       echo "=== shaderc ==="
+      echo "$SHADERC_PREFIX"
       pkg-config --modversion shaderc
+      pkg-config --cflags --libs shaderc
 
-  - name: Configure runtime-only build
+      echo "=== Available Apple SDKs ==="
+      xcodebuild -showsdks
+
+  - name: Check whether dependencies include iOS slices
     run: |
+      set -eu
+      VK_PREFIX="$(brew --prefix molten-vk)"
+      echo "=== MoltenVK framework contents ==="
+      find "$VK_PREFIX" -type d -name '*.xcframework' -print
+      find "$VK_PREFIX" -type f \
+        \( -name 'libMoltenVK.a' -o -name 'libMoltenVK.dylib' \) \
+        -print
+
+      echo "=== SDL3 framework contents ==="
+      SDL3_PREFIX="$(brew --prefix sdl3)"
+      find "$SDL3_PREFIX" -type d -name '*.xcframework' -print
+
+  - name: Configure runtime-only build for iOS
+    run: |
+      set -o pipefail
       cmake -S . -B build-ios \
         -G Ninja \
         -DCMAKE_SYSTEM_NAME=iOS \
@@ -52,8 +97,19 @@ steps:
         -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
         -DCMAKE_BUILD_TYPE=Release \
         -DDEFJAM_BUILD_GAME=OFF \
-        -DCMAKE_PREFIX_PATH="$(brew --prefix sdl3)"
+        -DCMAKE_PREFIX_PATH="$(brew --prefix sdl3)" \
+        2>&1 | tee configure-ios.log
 
-  - name: Report configured targets
+  - name: Save configuration log
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: ios-configure-log
+      path: |
+        configure-ios.log
+        build-ios/CMakeCache.txt
+      if-no-files-found: ignore
+
+  - name: List configured targets
     if: success()
     run: cmake --build build-ios --target help
