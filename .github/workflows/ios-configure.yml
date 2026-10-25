@@ -1,0 +1,59 @@
+name: iOS Configure Check
+
+on:
+workflow_dispatch:
+push:
+branches:
+- ios-port
+paths:
+- ".github/workflows/ios-configure.yml"
+
+permissions:
+contents: read
+
+jobs:
+configure:
+name: Check iOS dependencies
+runs-on: macos-14
+
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      submodules: recursive
+
+  - name: Install tools
+    run: |
+      brew install cmake ninja pkgconf sdl3 molten-vk shaderc
+
+  - name: Inspect SDL3 and Vulkan packages
+    run: |
+      echo "=== SDL3 ==="
+      brew --prefix sdl3
+      find "$(brew --prefix sdl3)" \
+        -name 'SDL3Config.cmake' \
+        -o -name 'sdl3-config.cmake'
+
+      echo "=== Vulkan / MoltenVK ==="
+      find "$(brew --prefix molten-vk)" \
+        -name 'vulkan.h' \
+        -o -name 'libMoltenVK*'
+
+      echo "=== shaderc ==="
+      pkg-config --modversion shaderc
+
+  - name: Configure runtime-only build
+    run: |
+      cmake -S . -B build-ios \
+        -G Ninja \
+        -DCMAKE_SYSTEM_NAME=iOS \
+        -DCMAKE_OSX_SYSROOT=iphoneos \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DDEFJAM_BUILD_GAME=OFF \
+        -DCMAKE_PREFIX_PATH="$(brew --prefix sdl3)"
+
+  - name: Report configured targets
+    if: success()
+    run: cmake --build build-ios --target help
