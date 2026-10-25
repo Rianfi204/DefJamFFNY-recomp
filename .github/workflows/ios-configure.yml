@@ -1,12 +1,12 @@
 name: iOS Configure Check
 
 on:
-workflow_dispatch:
-push:
-branches:
-- ios-port
-paths:
-- ".github/workflows/ios-configure.yml"
+  workflow_dispatch:
+  push:
+    branches:
+      - ios-port
+    paths:
+      - ".github/workflows/ios-configure.yml"
 
 permissions:
 contents: read
