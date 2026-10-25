@@ -46,6 +46,8 @@ jobs:
 
       - name: Configure runtime-only build for iOS
         run: |
+          VULKAN_PREFIX="$(brew --prefix molten-vk)"
+          SHADERC_PREFIX="$(brew --prefix shaderc)"
           cmake -S . -B build-ios \
             -G Ninja \
             -DCMAKE_SYSTEM_NAME=iOS \
@@ -53,7 +55,11 @@ jobs:
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
             -DCMAKE_BUILD_TYPE=Release \
-            -DDEFJAM_BUILD_GAME=OFF
+            -DDEFJAM_BUILD_GAME=OFF \
+            -DVulkan_INCLUDE_DIR="$VULKAN_PREFIX/libexec/include" \
+            -DVulkan_LIBRARY="$VULKAN_PREFIX/lib/libMoltenVK.a" \
+            -DSHADERC_INCLUDE_DIR="$SHADERC_PREFIX/include" \
+            -DSHADERC_LIBRARY="$SHADERC_PREFIX/lib/libshaderc_shared.1.dylib"
 
       - name: Report configured targets
         run: cmake --build build-ios --target help
