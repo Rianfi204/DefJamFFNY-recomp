@@ -1,65 +1,59 @@
-name: iOS CMake Configure
+name: iOS Configure Check
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - ios-port
-    paths:
-      - ".github/workflows/ios-configure.yml"
+workflow_dispatch:
+push:
+branches:
+- ios-port
+paths:
+- ".github/workflows/ios-configure.yml"
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
-  configure:
-    runs-on: macos-14
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+configure:
+name: Check iOS dependencies
+runs-on: macos-14
 
-      - name: Install build tools
-        run: brew install cmake ninja molten-vk shaderc pkgconf
+steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      submodules: recursive
 
-      - name: Inspect Vulkan and shaderc dependencies
-        run: |
-          echo "=== Installed packages ==="
-          for package in molten-vk shaderc vulkan-headers vulkan-loader pkgconf; do
-            echo "--- $package ---"
-            brew list --versions "$package" || true
-          done
-          echo "=== pkg-config ==="
-          pkg-config --modversion vulkan || true
-          pkg-config --cflags --libs vulkan || true
-          pkg-config --modversion shaderc || true
-          pkg-config --cflags --libs shaderc || true
-          echo "=== Homebrew files ==="
-          for directory in /opt/homebrew/Cellar/molten-vk /opt/homebrew/Cellar/vulkan-headers /opt/homebrew/Cellar/vulkan-loader /opt/homebrew/Cellar/shaderc; do
-            if [ -d "$directory" ]; then
-              find "$directory" -type f \( -name 'vulkan.h' -o -name 'shaderc.h' -o -name 'libvulkan*' -o -name 'libshaderc*' -o -name '*MoltenVK*' \) -print
-            else
-              echo "Not found: $directory"
-            fi
-          done
+  - name: Install tools
+    run: |
+      brew install cmake ninja pkgconf sdl3 molten-vk shaderc
 
-      - name: Configure runtime-only build for iOS
-        run: |
-          VULKAN_PREFIX="$(brew --prefix molten-vk)"
-          SHADERC_PREFIX="$(brew --prefix shaderc)"
-          cmake -S . -B build-ios \
-            -G Ninja \
-            -DCMAKE_SYSTEM_NAME=iOS \
-            -DCMAKE_OSX_SYSROOT=iphoneos \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DDEFJAM_BUILD_GAME=OFF \
-            -DVulkan_INCLUDE_DIR="$VULKAN_PREFIX/libexec/include" \
-            -DVulkan_LIBRARY="$VULKAN_PREFIX/lib/libMoltenVK.a" \
-            -DSHADERC_INCLUDE_DIR="$SHADERC_PREFIX/include" \
-            -DSHADERC_LIBRARY="$SHADERC_PREFIX/lib/libshaderc_shared.1.dylib"
+  - name: Inspect SDL3 and Vulkan packages
+    run: |
+      echo "=== SDL3 ==="
+      brew --prefix sdl3
+      find "$(brew --prefix sdl3)" \
+        -name 'SDL3Config.cmake' \
+        -o -name 'sdl3-config.cmake'
 
-      - name: Report configured targets
-        run: cmake --build build-ios --target help
+      echo "=== Vulkan / MoltenVK ==="
+      find "$(brew --prefix molten-vk)" \
+        -name 'vulkan.h' \
+        -o -name 'libMoltenVK*'
+
+      echo "=== shaderc ==="
+      pkg-config --modversion shaderc
+
+  - name: Configure runtime-only build
+    run: |
+      cmake -S . -B build-ios \
+        -G Ninja \
+        -DCMAKE_SYSTEM_NAME=iOS \
+        -DCMAKE_OSX_SYSROOT=iphoneos \
+        -DCMAKE_OSX_ARCHITECTURES=arm64 \
+        -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DDEFJAM_BUILD_GAME=OFF \
+        -DCMAKE_PREFIX_PATH="$(brew --prefix sdl3)"
+
+  - name: Report configured targets
+    if: success()
+    run: cmake --build build-ios --target help
